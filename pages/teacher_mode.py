@@ -42,13 +42,13 @@ st.divider()
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    st.subheader("🎙️ 음성 대화")
+    st.subheader("💬 음성 + 텍스트 대화")
 
 with col2:
     if st.button("🏠 튜터 변경"):
         st.switch_page("app.py")
 
-# WebSocket HTML Component
+# WebSocket HTML Component (텍스트 입력 기능 추가)
 websocket_html = f"""
 <!DOCTYPE html>
 <html>
@@ -100,11 +100,80 @@ websocket_html = f"""
             100% {{ opacity: 1; }}
         }}
         
-        .controls {{
+        /* 탭 스타일 */
+        .tabs {{
+            display: flex;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+        }}
+        
+        .tab {{
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            background: transparent;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+        }}
+        
+        .tab.active {{
+            background: rgba(255, 255, 255, 0.2);
+        }}
+        
+        .tab:hover {{
+            background: rgba(255, 255, 255, 0.15);
+        }}
+        
+        /* 입력 방식별 컨트롤 */
+        .input-controls {{
+            margin-bottom: 30px;
+        }}
+        
+        .voice-controls {{
             display: flex;
             justify-content: center;
             gap: 20px;
-            margin-bottom: 30px;
+        }}
+        
+        .text-controls {{
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+        }}
+        
+        .text-input-area {{
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }}
+        
+        .text-input {{
+            flex: 1;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 50px;
+            max-height: 150px;
+        }}
+        
+        .text-input::placeholder {{
+            color: rgba(255, 255, 255, 0.7);
+        }}
+        
+        .text-input:focus {{
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
         }}
         
         .btn {{
@@ -118,6 +187,7 @@ websocket_html = f"""
             display: flex;
             align-items: center;
             gap: 10px;
+            justify-content: center;
         }}
         
         .btn-record {{
@@ -146,6 +216,22 @@ websocket_html = f"""
         }}
         
         .btn-stop:disabled {{
+            background: #6c757d;
+            cursor: not-allowed;
+        }}
+        
+        .btn-send {{
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            min-width: 80px;
+        }}
+        
+        .btn-send:hover:not(:disabled) {{
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+        }}
+        
+        .btn-send:disabled {{
             background: #6c757d;
             cursor: not-allowed;
         }}
@@ -247,19 +333,48 @@ websocket_html = f"""
             <span id="statusText">연결 중...</span>
         </div>
         
-        <div class="controls">
-            <button class="btn btn-record" id="recordBtn" onclick="startRecording()" disabled>
-                🎤 음성 녹음 시작
+        <!-- 입력 방식 탭 -->
+        <div class="tabs">
+            <button class="tab active" id="voiceTab" onclick="switchTab('voice')">
+                🎤 음성 입력
             </button>
-            <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>
-                ⏹️ 녹음 중지
+            <button class="tab" id="textTab" onclick="switchTab('text')">
+                💬 텍스트 입력
             </button>
+        </div>
+        
+        <!-- 입력 컨트롤들 -->
+        <div class="input-controls">
+            <!-- 음성 입력 컨트롤 -->
+            <div class="voice-controls" id="voiceControls">
+                <button class="btn btn-record" id="recordBtn" onclick="startRecording()" disabled>
+                    🎤 음성 녹음 시작
+                </button>
+                <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>
+                    ⏹️ 녹음 중지
+                </button>
+            </div>
+            
+            <!-- 텍스트 입력 컨트롤 -->
+            <div class="text-controls" id="textControls">
+                <div class="text-input-area">
+                    <textarea 
+                        class="text-input" 
+                        id="textInput" 
+                        placeholder="질문을 입력하세요... (Enter로 전송, Shift+Enter로 줄바꿈)"
+                        rows="3"></textarea>
+                    <button class="btn btn-send" id="sendBtn" onclick="sendTextMessage()" disabled>
+                        📤 전송
+                    </button>
+                </div>
+            </div>
         </div>
         
         <div class="chat-area" id="chatArea">
             <div class="message ai-message">
                 안녕하세요! 저는 {teacher_config['name']} 선생님입니다. 🎓<br>
-                {teacher_config['subject']} 분야에 대해 무엇이든 물어보세요!
+                {teacher_config['subject']} 분야에 대해 무엇이든 물어보세요!<br>
+                <small style="opacity: 0.8;">💡 음성 또는 텍스트로 질문할 수 있습니다.</small>
             </div>
         </div>
         
@@ -272,7 +387,7 @@ websocket_html = f"""
         </div>
         
         <div class="info">
-            💡 마이크 버튼을 눌러 질문하세요. AI 튜터가 실시간으로 답변해드립니다.
+            💡 <span id="infoText">마이크 버튼을 눌러 질문하거나, 텍스트 탭에서 타이핑하세요.</span>
         </div>
     </div>
 
@@ -281,16 +396,87 @@ websocket_html = f"""
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
+        let currentInputMode = 'voice';
         
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
         const recordBtn = document.getElementById('recordBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
         const chatArea = document.getElementById('chatArea');
         const typingIndicator = document.getElementById('typingIndicator');
+        const infoText = document.getElementById('infoText');
         
         // 튜터 설정
         const teacherConfig = {json.dumps(teacher_config)};
+        
+        // 탭 전환
+        function switchTab(mode) {{
+            currentInputMode = mode;
+            
+            const voiceTab = document.getElementById('voiceTab');
+            const textTab = document.getElementById('textTab');
+            const voiceControls = document.getElementById('voiceControls');
+            const textControls = document.getElementById('textControls');
+            
+            if (mode === 'voice') {{
+                voiceTab.classList.add('active');
+                textTab.classList.remove('active');
+                voiceControls.style.display = 'flex';
+                textControls.style.display = 'none';
+                infoText.textContent = '마이크 버튼을 눌러 음성으로 질문하세요.';
+            }} else {{
+                voiceTab.classList.remove('active');
+                textTab.classList.add('active');
+                voiceControls.style.display = 'none';
+                textControls.style.display = 'flex';
+                textInput.focus();
+                infoText.textContent = '텍스트를 입력하고 전송 버튼을 클릭하세요.';
+            }}
+        }}
+        
+        // 텍스트 입력 이벤트
+        textInput.addEventListener('input', function() {{
+            const text = textInput.value.trim();
+            sendBtn.disabled = !text || !websocket || websocket.readyState !== WebSocket.OPEN;
+        }});
+        
+        // Enter 키 이벤트 (Shift+Enter는 줄바꿈, Enter는 전송)
+        textInput.addEventListener('keydown', function(event) {{
+            if (event.key === 'Enter' && !event.shiftKey) {{
+                event.preventDefault();
+                if (!sendBtn.disabled) {{
+                    sendTextMessage();
+                }}
+            }}
+        }});
+        
+        // 텍스트 메시지 전송
+        function sendTextMessage() {{
+            const text = textInput.value.trim();
+            if (!text || !websocket || websocket.readyState !== WebSocket.OPEN) {{
+                return;
+            }}
+            
+            // 사용자 메시지 표시
+            addMessage('user', text);
+            
+            // 서버로 전송
+            const message = {{
+                type: 'user_text',
+                text: text
+            }};
+            
+            websocket.send(JSON.stringify(message));
+            
+            // 입력 필드 초기화
+            textInput.value = '';
+            sendBtn.disabled = true;
+            
+            // 타이핑 표시
+            showTyping();
+        }}
         
         // WebSocket 연결
         function connectWebSocket() {{
@@ -307,6 +493,10 @@ websocket_html = f"""
                 statusDot.className = 'status-dot connected';
                 statusText.textContent = '연결됨 ✅';
                 recordBtn.disabled = false;
+                
+                // 텍스트 입력 활성화
+                const text = textInput.value.trim();
+                sendBtn.disabled = !text;
                 
                 // 튜터 설정 전송
                 const configMessage = {{
@@ -338,6 +528,7 @@ websocket_html = f"""
                 statusText.textContent = '연결 끊김 ❌';
                 recordBtn.disabled = true;
                 stopBtn.disabled = true;
+                sendBtn.disabled = true;
                 
                 // 5초 후 재연결 시도
                 setTimeout(() => {{
@@ -361,7 +552,7 @@ websocket_html = f"""
             
             switch(message.type) {{
                 case 'connection_established':
-                    addMessage('ai', message.message);
+                    // 연결 메시지는 이미 화면에 표시되어 있으므로 업데이트하지 않음
                     break;
                     
                 case 'config_updated':
@@ -376,7 +567,7 @@ websocket_html = f"""
                 case 'audio_chunk':
                     hideTyping();
                     addMessage('ai', message.content);
-                    if (message.audio && teacherConfig.voice_settings.auto_play) {{
+                    if (message.audio && teacherConfig.voice_settings && teacherConfig.voice_settings.auto_play) {{
                         playAudio(message.audio);
                     }}
                     break;
@@ -414,6 +605,7 @@ websocket_html = f"""
         // 타이핑 표시
         function showTyping() {{
             typingIndicator.style.display = 'block';
+            chatArea.scrollTop = chatArea.scrollHeight;
         }}
         
         function hideTyping() {{
@@ -431,13 +623,11 @@ websocket_html = f"""
                     console.log('오디오 재생 시작');
                 }}).catch(error => {{
                     console.error('오디오 재생 실패:', error);
-                    // 사용자 상호작용이 필요한 경우
                     if (error.name === 'NotAllowedError') {{
                         showError('브라우저에서 자동 재생이 차단되었습니다. 화면을 클릭한 후 다시 시도해주세요.');
                     }}
                 }});
                 
-                // 메모리 정리
                 audio.onended = () => {{
                     URL.revokeObjectURL(audioUrl);
                 }};
@@ -483,7 +673,6 @@ websocket_html = f"""
                     const audioBlob = new Blob(audioChunks, {{ type: 'audio/webm' }});
                     sendAudioToServer(audioBlob);
                     
-                    // 스트림 정리
                     stream.getTracks().forEach(track => track.stop());
                 }};
                 
@@ -576,16 +765,28 @@ with col2:
     st.write(f"**격려 수준:** {personality['encouragement']}%")
     st.write(f"**설명 상세도:** {personality.get('explanation_detail', 70)}%")
 
-# 사용법 안내
+# 사용법 안내 (업데이트)
 with st.expander("📖 사용법 안내"):
     st.markdown("""
+    ### 💬 텍스트 대화 방법
+    1. **💬 텍스트 입력** 탭을 클릭하세요
+    2. **텍스트 입력 필드**에 질문을 입력하세요
+    3. **📤 전송** 버튼을 클릭하거나 **Enter 키**를 누르세요
+    4. **AI 튜터의 답변**을 텍스트와 음성으로 받을 수 있습니다
+    
     ### 🎙️ 음성 대화 방법
-    1. **🟢 연결됨** 상태가 될 때까지 기다리세요
+    1. **🎤 음성 입력** 탭을 클릭하세요
     2. **🎤 음성 녹음 시작** 버튼을 클릭하세요
     3. **마이크 권한을 허용**해주세요 (브라우저에서 요청 시)
     4. **질문을 말씀해주세요** (예: "미적분학에 대해 설명해주세요")
     5. **⏹️ 녹음 중지** 버튼을 클릭하세요
     6. **AI 튜터의 답변**을 텍스트와 음성으로 들으실 수 있습니다
+    
+    ### 💡 팁
+    - **텍스트 입력**: 빠르고 정확한 질문, 긴 내용 입력에 적합
+    - **음성 입력**: 자연스러운 대화, 발음 연습에 적합
+    - **Shift + Enter**: 텍스트 입력에서 줄바꿈
+    - **Enter**: 텍스트 전송
     
     ### 🔧 문제 해결
     - **마이크 접근 오류**: 브라우저 설정에서 마이크 권한을 허용해주세요
@@ -602,9 +803,11 @@ with st.expander("🔧 기술 정보"):
     - **실시간 통신**: WebSocket
     - **AI 모델**: GPT-3.5 Turbo Streaming
     - **음성 합성**: Google Cloud TTS Standard
+    - **입력 방식**: 음성(STT) + 텍스트 동시 지원
     
     ### WebSocket 연결 정보
     - **서버 URL**: `{WEBSOCKET_URL}`
     - **연결 상태**: 실시간 표시
     - **자동 재연결**: 5초 후 재시도
+    - **지원 메시지**: 음성(바이너리), 텍스트(JSON)
     """)
