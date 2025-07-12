@@ -32,9 +32,9 @@ with col1:
 with col2:
     st.metric("성격", f"친근함 {teacher_config['personality']['friendliness']}%", "")
 with col3:
-    st.metric("백엔드", "🟢 정상", "Cloud Run")
+    st.metric("백엔드", "🟢 최적화", "v2.1.1")
 with col4:
-    st.metric("AI 모델", "GPT-3.5", "비용 최적화")
+    st.metric("스트리밍", "자연스러운", "단어 단위")
 
 st.divider()
 
@@ -42,13 +42,13 @@ st.divider()
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    st.subheader("💬 음성 + 텍스트 대화")
+    st.subheader("💬 자연스러운 음성 + 텍스트 대화")
 
 with col2:
     if st.button("🏠 튜터 변경"):
         st.switch_page("app.py")
 
-# WebSocket HTML Component (텍스트 입력 기능 추가)
+# WebSocket HTML Component (충돌 없는 완전 개선 버전)
 websocket_html = f"""
 <!DOCTYPE html>
 <html>
@@ -176,6 +176,12 @@ websocket_html = f"""
             background: rgba(255, 255, 255, 0.15);
         }}
         
+        .text-input:disabled {{
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            cursor: not-allowed;
+        }}
+        
         .btn {{
             padding: 15px 30px;
             border: none;
@@ -264,6 +270,32 @@ websocket_html = f"""
         .ai-message {{
             background: rgba(255, 255, 255, 0.15);
             margin-right: auto;
+        }}
+        
+        /* 스트리밍 효과 CSS */
+        .ai-message.streaming {{
+            border-left: 3px solid #4CAF50;
+            position: relative;
+        }}
+        
+        .streaming-cursor {{
+            animation: blink 1s infinite;
+            color: #4CAF50;
+            font-weight: bold;
+        }}
+        
+        @keyframes blink {{
+            0%, 50% {{ opacity: 1; }}
+            51%, 100% {{ opacity: 0; }}
+        }}
+        
+        .typing-effect {{
+            animation: typeGlow 0.1s ease;
+        }}
+        
+        @keyframes typeGlow {{
+            0% {{ background: rgba(255, 255, 255, 0.15); }}
+            100% {{ background: rgba(255, 255, 255, 0.05); }}
         }}
         
         @keyframes slideIn {{
@@ -374,7 +406,7 @@ websocket_html = f"""
             <div class="message ai-message">
                 안녕하세요! 저는 {teacher_config['name']} 선생님입니다. 🎓<br>
                 {teacher_config['subject']} 분야에 대해 무엇이든 물어보세요!<br>
-                <small style="opacity: 0.8;">💡 음성 또는 텍스트로 질문할 수 있습니다.</small>
+                <small style="opacity: 0.8;">💡 코파일럿 수준의 자연스러운 스트리밍으로 답변해드립니다.</small>
             </div>
         </div>
         
@@ -397,6 +429,10 @@ websocket_html = f"""
         let audioChunks = [];
         let isRecording = false;
         let currentInputMode = 'voice';
+        
+        // 스트리밍 관련 변수
+        let currentAIMessage = null;
+        let isResponseInProgress = false;
         
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
@@ -439,10 +475,10 @@ websocket_html = f"""
         // 텍스트 입력 이벤트
         textInput.addEventListener('input', function() {{
             const text = textInput.value.trim();
-            sendBtn.disabled = !text || !websocket || websocket.readyState !== WebSocket.OPEN;
+            sendBtn.disabled = !text || !isConnected() || isResponseInProgress;
         }});
         
-        // Enter 키 이벤트 (Shift+Enter는 줄바꿈, Enter는 전송)
+        // Enter 키 이벤트
         textInput.addEventListener('keydown', function(event) {{
             if (event.key === 'Enter' && !event.shiftKey) {{
                 event.preventDefault();
@@ -455,12 +491,12 @@ websocket_html = f"""
         // 텍스트 메시지 전송
         function sendTextMessage() {{
             const text = textInput.value.trim();
-            if (!text || !websocket || websocket.readyState !== WebSocket.OPEN) {{
+            if (!text || !isConnected() || isResponseInProgress) {{
                 return;
             }}
             
             // 사용자 메시지 표시
-            addMessage('user', text);
+            addUserMessage(text);
             
             // 서버로 전송
             const message = {{
@@ -473,9 +509,6 @@ websocket_html = f"""
             // 입력 필드 초기화
             textInput.value = '';
             sendBtn.disabled = true;
-            
-            // 타이핑 표시
-            showTyping();
         }}
         
         // WebSocket 연결
@@ -492,11 +525,7 @@ websocket_html = f"""
                 console.log('WebSocket 연결 성공');
                 statusDot.className = 'status-dot connected';
                 statusText.textContent = '연결됨 ✅';
-                recordBtn.disabled = false;
-                
-                // 텍스트 입력 활성화
-                const text = textInput.value.trim();
-                sendBtn.disabled = !text;
+                updateUIState(false);
                 
                 // 튜터 설정 전송
                 const configMessage = {{
@@ -505,7 +534,12 @@ websocket_html = f"""
                         name: teacherConfig.name,
                         subject: teacherConfig.subject,
                         level: teacherConfig.level,
-                        personality: teacherConfig.personality
+                        personality: teacherConfig.personality,
+                        voice_settings: {{
+                            auto_play: true,
+                            speed: 1.0,
+                            pitch: 1.0
+                        }}
                     }}
                 }};
                 websocket.send(JSON.stringify(configMessage));
@@ -526,9 +560,8 @@ websocket_html = f"""
                 console.log('WebSocket 연결 종료');
                 statusDot.className = 'status-dot disconnected';
                 statusText.textContent = '연결 끊김 ❌';
-                recordBtn.disabled = true;
-                stopBtn.disabled = true;
-                sendBtn.disabled = true;
+                isResponseInProgress = false;
+                updateUIState(false);
                 
                 // 5초 후 재연결 시도
                 setTimeout(() => {{
@@ -546,45 +579,175 @@ websocket_html = f"""
             }};
         }}
         
-        // 서버 메시지 처리
+        // 개선된 서버 메시지 처리 (충돌 없는 버전)
         function handleServerMessage(message) {{
             console.log('서버 메시지:', message);
             
             switch(message.type) {{
                 case 'connection_established':
-                    // 연결 메시지는 이미 화면에 표시되어 있으므로 업데이트하지 않음
+                    // 연결 메시지는 이미 화면에 표시되어 있으므로 처리하지 않음
                     break;
                     
                 case 'config_updated':
                     console.log('튜터 설정 업데이트 완료');
                     break;
                     
-                case 'stt_result':
-                    addMessage('user', message.text);
+                case 'response_start':
+                    // AI 응답 시작 - 새 메시지 컨테이너 생성
+                    isResponseInProgress = true;
+                    updateUIState(true);
+                    currentAIMessage = createNewAIMessage();
                     showTyping();
                     break;
                     
-                case 'audio_chunk':
+                case 'text_chunk':
+                    // 기존 AI 메시지에 텍스트 추가 (append) - 충돌 방지
                     hideTyping();
-                    addMessage('ai', message.content);
-                    if (message.audio && teacherConfig.voice_settings && teacherConfig.voice_settings.auto_play) {{
-                        playAudio(message.audio);
+                    
+                    if (isResponseInProgress && currentAIMessage) {{
+                        // 새 방식: 기존 메시지에 텍스트 추가
+                        appendToAIMessage(currentAIMessage, message.content);
+                    }} else {{
+                        // Fallback: 응답 진행 상태가 아닌 경우 안전장치
+                        console.warn('예상치 못한 text_chunk 수신:', message);
+                        addMessage('ai', message.content);
                     }}
                     break;
                     
-                case 'text_chunk':
-                    hideTyping();
-                    addMessage('ai', message.content);
+                case 'response_complete':
+                    // AI 텍스트 응답 완료
+                    if (currentAIMessage) {{
+                        removeStreamingCursor(currentAIMessage);
+                    }}
+                    break;
+                    
+                case 'audio_chunk':
+                    // TTS 완료 - 전체 대화 완료
+                    isResponseInProgress = false;
+                    updateUIState(false);
+                    if (message.audio && shouldPlayAudio()) {{
+                        playAudio(message.audio);
+                    }}
+                    currentAIMessage = null;
+                    break;
+                    
+                case 'stt_result':
+                    // 사용자 음성 인식 결과
+                    addUserMessage(message.text);
                     break;
                     
                 case 'error':
+                    // 에러 처리
                     hideTyping();
+                    isResponseInProgress = false;
+                    updateUIState(false);
+                    currentAIMessage = null;
                     showError(message.message);
                     break;
+                    
+                default:
+                    console.warn('알 수 없는 메시지 타입:', message.type);
             }}
         }}
         
-        // 메시지 추가
+        // 새로운 AI 메시지 컨테이너 생성
+        function createNewAIMessage() {{
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ai-message streaming';
+            messageDiv.innerHTML = '<span class="streaming-cursor">▋</span>';
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            return messageDiv;
+        }}
+        
+        // AI 메시지에 텍스트 점진적 추가
+        function appendToAIMessage(messageElement, newContent) {{
+            // 커서 제거
+            const cursor = messageElement.querySelector('.streaming-cursor');
+            if (cursor) {{
+                cursor.remove();
+            }}
+            
+            // 새 텍스트 추가
+            const currentText = messageElement.textContent || '';
+            messageElement.innerHTML = currentText + newContent + '<span class="streaming-cursor">▋</span>';
+            
+            // 스크롤 자동 이동
+            chatArea.scrollTop = chatArea.scrollHeight;
+            
+            // 타이핑 애니메이션 효과
+            messageElement.classList.add('typing-effect');
+            setTimeout(() => {{
+                messageElement.classList.remove('typing-effect');
+            }}, 100);
+        }}
+        
+        // 스트리밍 커서 제거
+        function removeStreamingCursor(messageElement) {{
+            const cursor = messageElement.querySelector('.streaming-cursor');
+            if (cursor) {{
+                cursor.remove();
+            }}
+            messageElement.classList.remove('streaming');
+        }}
+        
+        // UI 상태 업데이트 (입력 제어)
+        function updateUIState(isProcessing) {{
+            // 음성 입력 제어
+            recordBtn.disabled = isProcessing || !isConnected();
+            stopBtn.disabled = !isRecording;
+            
+            // 텍스트 입력 제어
+            if (textInput) {{
+                textInput.disabled = isProcessing;
+                if (isProcessing) {{
+                    textInput.placeholder = 'AI가 응답하는 중입니다... 잠시만 기다려주세요.';
+                }} else {{
+                    textInput.placeholder = '질문을 입력하세요... (Enter로 전송, Shift+Enter로 줄바꿈)';
+                }}
+            }}
+            
+            if (sendBtn) {{
+                const text = textInput ? textInput.value.trim() : '';
+                sendBtn.disabled = isProcessing || !text || !isConnected();
+            }}
+            
+            // 상태 표시 업데이트
+            if (isProcessing) {{
+                statusText.textContent = '응답 생성 중... 🤖';
+            }} else if (isConnected()) {{
+                statusText.textContent = '연결됨 ✅';
+            }}
+        }}
+        
+        // 연결 상태 확인
+        function isConnected() {{
+            return websocket && websocket.readyState === WebSocket.OPEN;
+        }}
+        
+        // 오디오 재생 여부 결정
+        function shouldPlayAudio() {{
+            return teacherConfig.voice_settings && 
+                   teacherConfig.voice_settings.auto_play && 
+                   !isResponseInProgress;
+        }}
+        
+        // 사용자 메시지 추가
+        function addUserMessage(text) {{
+            // 응답 진행 중이면 사용자 메시지 추가하지 않음
+            if (isResponseInProgress) {{
+                console.warn('응답 진행 중 - 사용자 메시지 무시');
+                return;
+            }}
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user-message';
+            messageDiv.textContent = text;
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }}
+        
+        // 기존 메시지 추가 함수 (fallback용)
         function addMessage(sender, text) {{
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${{sender}}-message`;
@@ -766,15 +929,22 @@ with col2:
     st.write(f"**설명 상세도:** {personality.get('explanation_detail', 70)}%")
 
 # 사용법 안내 (업데이트)
-with st.expander("📖 사용법 안내"):
+with st.expander("🎉 개선 사항 및 사용법"):
     st.markdown("""
-    ### 💬 텍스트 대화 방법
+    ### 🎉 **주요 개선 사항 (v2.1.1)**
+    - ✅ **자연스러운 스트리밍**: 코파일럿처럼 텍스트가 단어 단위로 자연스럽게 나타남
+    - ✅ **대화 상태 관리**: 응답 중 새 질문 자동 차단으로 안정적인 대화
+    - ✅ **충돌 방지**: 기존 코드와의 충돌을 완전히 제거한 안전한 구현
+    - ✅ **타이핑 효과**: 실시간 커서 표시로 생동감 있는 UI
+    - ✅ **상태 피드백**: 현재 진행 상황을 명확하게 표시
+    
+    ### 💬 **텍스트 대화 방법**
     1. **💬 텍스트 입력** 탭을 클릭하세요
     2. **텍스트 입력 필드**에 질문을 입력하세요
     3. **📤 전송** 버튼을 클릭하거나 **Enter 키**를 누르세요
-    4. **AI 튜터의 답변**을 텍스트와 음성으로 받을 수 있습니다
+    4. **AI 튜터의 답변**을 자연스러운 스트리밍으로 확인하세요
     
-    ### 🎙️ 음성 대화 방법
+    ### 🎙️ **음성 대화 방법**
     1. **🎤 음성 입력** 탭을 클릭하세요
     2. **🎤 음성 녹음 시작** 버튼을 클릭하세요
     3. **마이크 권한을 허용**해주세요 (브라우저에서 요청 시)
@@ -782,32 +952,45 @@ with st.expander("📖 사용법 안내"):
     5. **⏹️ 녹음 중지** 버튼을 클릭하세요
     6. **AI 튜터의 답변**을 텍스트와 음성으로 들으실 수 있습니다
     
-    ### 💡 팁
-    - **텍스트 입력**: 빠르고 정확한 질문, 긴 내용 입력에 적합
-    - **음성 입력**: 자연스러운 대화, 발음 연습에 적합
-    - **Shift + Enter**: 텍스트 입력에서 줄바꿈
-    - **Enter**: 텍스트 전송
+    ### 💡 **개선된 기능 설명**
+    - **응답 중 상태 관리**: AI가 답변하는 동안 새 질문이 자동으로 차단됩니다
+    - **자연스러운 스트리밍**: 텍스트가 한 음절씩이 아닌 단어 단위로 자연스럽게 나타납니다
+    - **실시간 피드백**: 타이핑 커서와 상태 표시로 현재 진행 상황을 명확히 보여줍니다
+    - **충돌 방지**: 기존 코드와의 충돌을 완전히 제거하여 안정적으로 작동합니다
     
-    ### 🔧 문제 해결
+    ### 🔧 **문제 해결**
     - **마이크 접근 오류**: 브라우저 설정에서 마이크 권한을 허용해주세요
     - **연결 오류**: 페이지를 새로고침하거나 네트워크 상태를 확인해주세요
     - **음성 재생 안됨**: 브라우저에서 자동 재생이 차단된 경우, 화면을 클릭한 후 다시 시도해주세요
     """)
 
 # 기술 정보
-with st.expander("🔧 기술 정보"):
+with st.expander("🔧 기술 정보 (v2.1.1)"):
     st.markdown(f"""
     ### 시스템 구성
-    - **프론트엔드**: Streamlit Cloud
-    - **백엔드**: FastAPI (Google Cloud Run)
-    - **실시간 통신**: WebSocket
-    - **AI 모델**: GPT-3.5 Turbo Streaming
+    - **프론트엔드**: Streamlit Cloud (메시지 append 로직, 충돌 방지)
+    - **백엔드**: FastAPI v2.1.1 (Google Cloud Run, 상태 관리, 단어 단위 청킹)
+    - **실시간 통신**: WebSocket (개선된 메시지 처리, 상태 동기화)
+    - **AI 모델**: GPT-3.5 Turbo Streaming (자연스러운 단어 단위 청킹)
     - **음성 합성**: Google Cloud TTS Standard
     - **입력 방식**: 음성(STT) + 텍스트 동시 지원
+    
+    ### 핵심 개선 사항
+    - **메시지 Append**: 실시간 텍스트 추가 로직으로 자연스러운 스트리밍
+    - **상태 관리**: `isResponseInProgress` 플래그로 동시 진행 방지
+    - **청킹 최적화**: 단어 단위 자연스러운 스트리밍 (기존 음절 단위 문제 해결)
+    - **충돌 방지**: 기존 코드와의 충돌을 완전히 제거한 안전한 구현
+    - **UI 피드백**: 타이핑 커서, 상태 표시, 애니메이션 효과
+    
+    ### WebSocket 메시지 타입
+    - **연결**: `connection_established`, `config_updated`
+    - **응답**: `response_start`, `text_chunk`, `response_complete`, `audio_chunk`
+    - **입력**: `stt_result`, `user_text`
+    - **상태**: `error`, `ping`, `pong`
     
     ### WebSocket 연결 정보
     - **서버 URL**: `{WEBSOCKET_URL}`
     - **연결 상태**: 실시간 표시
     - **자동 재연결**: 5초 후 재시도
-    - **지원 메시지**: 음성(바이너리), 텍스트(JSON)
+    - **지원 메시지**: 음성(바이너리), 텍스트(JSON), 상태 관리
     """)
