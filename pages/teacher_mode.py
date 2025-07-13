@@ -508,18 +508,25 @@ websocket_html = f"""
     </div>
 
     <script>
-        // 기존 변수들 완전 유지
+        // 전역 변수들 (기존 + 중복 방지 변수 추가)
         let websocket = null;
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
         
-        // NEW: v3.0.0 변수들 추가
+        // v3.0.0 변수들
         let currentInputMode = 'voice';
         let currentAIMessage = null;
         let isResponseInProgress = false;
         let responseStartTime = null;
         let currentResponseStrategy = null;
+        
+        // 🔒 중복 방지 변수들 (NEW)
+        let currentAudio = null;        // 현재 재생 중인 오디오 추적
+        let isTextSending = false;      // 텍스트 전송 상태 추적
+        let isInterrupting = false;     // 중단 처리 상태 추적
+        let lastFeedbackTime = 0;       // 마지막 피드백 시간 추적
+        let lastMessageId = null;       // 마지막 메시지 ID 추적
         
         // 기존 요소들 완전 유지
         const statusDot = document.getElementById('statusDot');
