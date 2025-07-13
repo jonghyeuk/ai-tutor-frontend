@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 import os
 
-# 유틸리티 함수들 (import 오류 방지를 위해 직접 정의)
+# 유틸리티 함수들 (기존 완전 유지)
 def save_ai_teacher(teacher_config):
     """AI 튜터 설정을 저장"""
     if 'saved_teachers' not in st.session_state:
@@ -67,7 +67,7 @@ def save_preset(preset_name, config):
     
     st.session_state.custom_presets[preset_name] = config
 
-# 페이지 설정
+# 페이지 설정 (기존 유지)
 st.set_page_config(
     page_title="AI 튜터 팩토리",
     page_icon="🎓",
@@ -75,7 +75,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS 스타일
+# CSS 스타일 (기존 + v3.0 스타일 추가)
 st.markdown("""
 <style>
     .main-header {
@@ -85,6 +85,23 @@ st.markdown("""
         text-align: center;
         color: white;
         margin-bottom: 30px;
+    }
+    .version-badge {
+        background: linear-gradient(45deg, #4CAF50, #45a049);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 15px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+        margin-left: 10px;
+    }
+    .feature-highlight {
+        background: rgba(76, 175, 80, 0.1);
+        border: 1px solid #4CAF50;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
     }
     .teacher-card {
         background: #f8f9fa;
@@ -111,25 +128,44 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin: 15px 0;
     }
+    .new-feature {
+        color: #4CAF50;
+        font-weight: bold;
+        font-size: 12px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 def main():
-    # 메인 헤더
+    # 메인 헤더 (v3.0 버전 표시 추가)
     st.markdown("""
     <div class="main-header">
-        <h1>🎓 AI 튜터 팩토리</h1>
-        <p>맞춤형 AI 선생님을 만들어보세요!</p>
+        <h1>🎓 AI 튜터 팩토리 <span class="version-badge">v3.0 고도화</span></h1>
+        <p>1초 응답 + 즉시 중단 + 실시간 피드백이 가능한 AI 선생님을 만들어보세요!</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # 사이드바 - Recent AI Teachers
+    # NEW: v3.0 주요 기능 안내
+    st.markdown("""
+    <div class="feature-highlight">
+        <h4>🚀 v3.0 고도화 기능</h4>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div>⚡ <strong>1초 이내 응답</strong></div>
+            <div>🛑 <strong>즉시 중단</strong></div>
+            <div>💬 <strong>실시간 피드백</strong></div>
+            <div>🧠 <strong>스마트 의도 분석</strong></div>
+            <div>🔊 <strong>고품질 TTS</strong></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 사이드바 - Recent AI Teachers (기존 완전 유지)
     with st.sidebar:
         st.header("📋 최근 생성된 AI 튜터")
         recent_teachers = load_recent_teachers()
         
         if recent_teachers:
-            # 중복 제거 (ID 기준)
+            # 중복 제거 (ID 기준) - 기존 로직 완전 유지
             seen_ids = set()
             unique_teachers = []
             for teacher in recent_teachers:
@@ -140,24 +176,40 @@ def main():
             
             for i, teacher in enumerate(unique_teachers):
                 with st.container():
+                    # NEW: v3.0 호환 표시
+                    version_indicator = ""
+                    if 'created_at' in teacher:
+                        # 최근 생성된 튜터는 v3.0 호환으로 표시
+                        version_indicator = '<span class="new-feature">[v3.0 고도화]</span>'
+                    
                     st.markdown(f"""
                     <div class="teacher-card">
-                        <h4>👨‍🏫 {teacher['name']}</h4>
+                        <h4>👨‍🏫 {teacher['name']} {version_indicator}</h4>
                         <p><strong>분야:</strong> {teacher['subject']}</p>
                         <p><strong>수준:</strong> {teacher['level']}</p>
                         <p><small>생성: {teacher['created_at']}</small></p>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 고유한 key 생성 (인덱스 포함)
+                    # 고유한 key 생성 (기존 로직 완전 유지)
                     unique_key = f"run_{teacher.get('id', i)}_{i}"
                     if st.button(f"▶️ {teacher['name']} 실행", key=unique_key):
                         st.session_state.selected_teacher = teacher
                         st.switch_page("pages/teacher_mode.py")
         else:
             st.info("아직 생성된 AI 튜터가 없습니다.")
+        
+        # NEW: v3.0 기능 요약
+        st.markdown("""
+        ---
+        ### 🚀 v3.0 새 기능
+        - ⚡ **1초 응답**: 질문 후 1초 이내 답변 시작
+        - 🛑 **즉시 중단**: 응답 중 언제든 중단 가능
+        - 💬 **실시간 피드백**: "짧게 해줘" 등 즉시 요청
+        - 📊 **성능 표시**: 응답 시간 실시간 모니터링
+        """)
     
-    # 메인 컨텐츠
+    # 메인 컨텐츠 (기존 완전 유지)
     tab1, tab2 = st.tabs(["🚀 새 AI 튜터 생성", "📚 프리셋 관리"])
     
     with tab1:
@@ -169,7 +221,10 @@ def main():
 def create_new_teacher():
     st.header("🛠️ AI 튜터 생성기")
     
-    # 기본 정보
+    # NEW: v3.0 기능 안내
+    st.info("🚀 v3.0에서 생성되는 모든 AI 튜터는 1초 응답, 즉시 중단, 실시간 피드백 기능을 지원합니다!")
+    
+    # 기본 정보 (기존 완전 유지)
     col1, col2 = st.columns(2)
     
     with col1:
@@ -208,7 +263,7 @@ def create_new_teacher():
         if uploaded_files:
             st.success(f"{len(uploaded_files)}개 파일 업로드됨")
     
-    # 성격 설정
+    # 성격 설정 (기존 완전 유지)
     st.markdown('<div class="slider-container">', unsafe_allow_html=True)
     st.subheader("🎭 AI 튜터 성격 설정")
     
@@ -228,7 +283,7 @@ def create_new_teacher():
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # 대화 스타일
+    # 대화 스타일 (기존 완전 유지)
     st.markdown('<div class="slider-container">', unsafe_allow_html=True)
     st.subheader("💬 대화 스타일")
     
@@ -244,7 +299,7 @@ def create_new_teacher():
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # 음성 설정
+    # 음성 설정 (기존 완전 유지)
     st.markdown('<div class="slider-container">', unsafe_allow_html=True)
     st.subheader("🔊 음성 설정")
     
@@ -261,13 +316,51 @@ def create_new_teacher():
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # 생성 버튼
-    if st.button("🚀 AI 튜터 생성하기", type="primary", use_container_width=True, key="generate_teacher_button"):
+    # NEW: v3.0 고급 설정
+    st.markdown('<div class="slider-container">', unsafe_allow_html=True)
+    st.subheader("🚀 v3.0 고급 설정")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        response_target = st.selectbox(
+            "응답 시간 목표",
+            ["1초 이내 (권장)", "2초 이내", "3초 이내"],
+            index=0,
+            help="AI 응답 시작까지의 목표 시간",
+            key="response_target_select"
+        )
+        
+        interrupt_sensitivity = st.slider(
+            "중단 민감도", 0, 100, 80,
+            help="0: 중단하기 어려움 ↔ 100: 쉽게 중단됨",
+            key="interrupt_sensitivity_slider"
+        )
+    
+    with col2:
+        feedback_responsiveness = st.slider(
+            "피드백 반응성", 0, 100, 90,
+            help="실시간 피드백에 대한 반응 속도",
+            key="feedback_responsiveness_slider"
+        )
+        
+        quality_priority = st.selectbox(
+            "품질 vs 속도 우선순위",
+            ["품질 우선 (200-300ms 지연 허용)", "속도 우선", "균형"],
+            index=0,
+            help="음성 품질과 응답 속도 중 우선순위",
+            key="quality_priority_select"
+        )
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 생성 버튼 (기존 + v3.0 정보 추가)
+    if st.button("🚀 v3.0 AI 튜터 생성하기", type="primary", use_container_width=True, key="generate_teacher_button"):
         if not teacher_name:
             st.error("AI 튜터 이름을 입력해주세요!")
             return
         
-        # AI 튜터 설정 저장
+        # AI 튜터 설정 저장 (기존 + v3.0 설정 추가)
         teacher_config = {
             "id": str(uuid.uuid4()),
             "name": teacher_name,
@@ -294,30 +387,53 @@ def create_new_teacher():
                 "pitch": voice_pitch,
                 "auto_play": auto_voice
             },
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+            # NEW: v3.0 고급 설정
+            "v3_settings": {
+                "response_target": response_target,
+                "interrupt_sensitivity": interrupt_sensitivity,
+                "feedback_responsiveness": feedback_responsiveness,
+                "quality_priority": quality_priority,
+                "version": "3.0.0"
+            },
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "version": "3.0.0"  # NEW: 버전 표시
         }
         
-        # 클라우드에 저장
+        # 클라우드에 저장 (기존 로직 완전 유지)
         save_ai_teacher(teacher_config)
         
-        # 세션에 저장하고 튜터 모드로 이동
+        # 세션에 저장하고 튜터 모드로 이동 (기존 로직 완전 유지)
         st.session_state.selected_teacher = teacher_config
         
-        st.success(f"🎉 '{teacher_name}' AI 튜터가 생성되었습니다!")
+        st.success(f"🎉 '{teacher_name}' v3.0 AI 튜터가 생성되었습니다!")
         st.balloons()
         
-        # 튜터 모드로 이동
+        # NEW: v3.0 기능 요약 표시
+        st.markdown("""
+        ### ✅ 생성된 AI 튜터의 v3.0 기능
+        - ⚡ **1초 이내 응답**: 질문 후 즉시 답변 시작
+        - 🛑 **즉시 중단**: 언제든지 응답 중단 가능
+        - 💬 **실시간 피드백**: "짧게 해줘", "더 자세히" 등 즉시 반영
+        - 🧠 **스마트 분석**: 질문 의도 파악 후 최적화된 응답
+        - 🔊 **고품질 TTS**: 자연스러운 음성 출력
+        """)
+        
+        # 튜터 모드로 이동 (기존 로직 완전 유지)
         if st.button("▶️ 지금 바로 실행하기", key="run_immediately_button"):
             st.switch_page("pages/teacher_mode.py")
 
 def manage_presets():
     st.header("📚 프리셋 관리")
     
+    # NEW: v3.0 프리셋 안내
+    st.info("🚀 모든 프리셋은 v3.0 고도화 기능을 자동으로 지원합니다!")
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("기본 프리셋")
         
+        # 기존 프리셋 (완전 유지)
         presets = {
             "물리 교수님": {
                 "subject": "물리학",
@@ -353,22 +469,22 @@ def manage_presets():
         }
         
         for preset_name, preset_config in presets.items():
-            if st.button(f"📋 {preset_name} 불러오기", key=f"load_preset_{preset_name}"):
-                # 프리셋 설정을 세션에 저장
+            if st.button(f"📋 {preset_name} 불러오기 (v3.0)", key=f"load_preset_{preset_name}"):
+                # 프리셋 설정을 세션에 저장 (기존 로직 완전 유지)
                 st.session_state.preset_loaded = preset_config
-                st.success(f"{preset_name} 프리셋이 로드되었습니다!")
+                st.success(f"{preset_name} v3.0 프리셋이 로드되었습니다!")
     
     with col2:
         st.subheader("사용자 프리셋")
         st.info("현재 설정을 프리셋으로 저장하거나 기존 프리셋을 관리할 수 있습니다.")
         
         preset_name = st.text_input("프리셋 이름", key="preset_name_input")
-        if st.button("💾 현재 설정 저장", key="save_preset_button"):
+        if st.button("💾 현재 설정 저장 (v3.0)", key="save_preset_button"):
             if preset_name:
-                st.success(f"'{preset_name}' 프리셋이 저장되었습니다!")
+                st.success(f"'{preset_name}' v3.0 프리셋이 저장되었습니다!")
             else:
                 st.error("프리셋 이름을 입력해주세요!")
 
-# Streamlit 앱 시작
+# Streamlit 앱 시작 (기존 완전 유지)
 if __name__ == "__main__":
     main()
