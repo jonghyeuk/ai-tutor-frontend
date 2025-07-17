@@ -55,7 +55,7 @@ teacher_level = teacher_config['level']
 teacher_friendliness = teacher_config['personality']['friendliness']
 teacher_humor = teacher_config['personality']['humor_level']
 teacher_encouragement = teacher_config['personality']['encouragement']
-# teacher_config_json = json.dumps(teacher_config).replace('"', '\\"')
+# teacher_config_json = json.dumps(teacher_config).replace('"', '\\"')  # JSON 에러 방지를 위해 주석 처리
 
 # 🔒 v4.0 언어교육 AI 수준 WebSocket HTML Component (JavaScript 충돌 해결)
 websocket_html = f"""
@@ -537,21 +537,22 @@ websocket_html = f"""
         const emotionIcon = document.getElementById('emotionIcon');
         const emotionText = document.getElementById('emotionText');
         
-        const teacherConfig = {
+        // 🔒 JSON 에러 방지: 안전한 하드코딩된 객체 사용
+        const teacherConfig = {{
             name: "{teacher_name}",
             subject: "{teacher_subject}",
             level: "{teacher_level}",
-            personality: {
+            personality: {{
                 friendliness: {teacher_friendliness},
                 humor_level: {teacher_humor},
                 encouragement: {teacher_encouragement}
-            },
-            voice_settings: {
+            }},
+            voice_settings: {{
                 auto_play: true,
                 speed: 1.0,
                 pitch: 1.0
-            }
-        };
+            }}
+        }};
         
         // 🔒 핵심! 중첩 완전 방지 오디오 재생 함수
         function playAudio(base64Audio, audioId = null) {{
